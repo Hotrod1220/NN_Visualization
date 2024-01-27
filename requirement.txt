@@ -1,0 +1,6 @@
+inquirer
+matplotlib
+numpy
+pathlib
+seaborn
+torch
