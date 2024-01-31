@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import torch
 import inquirer
+import numpy as np
 import matplotlib.pyplot as plt
 
 from abc import ABC, abstractmethod
@@ -43,8 +45,8 @@ class Visual(ABC):
         self,
         file: str,
         model: str,
-        layer: str,
-        layer_num: str
+        layer: str = None,
+        layer_num: str = None
     ):
         """Saves figure to folder.
 
@@ -58,9 +60,14 @@ class Visual(ABC):
 
         path = Path.cwd().joinpath('Visualization')
         path = path.joinpath(self.folder).joinpath(file)
-        path = path.joinpath(model).joinpath(layer)
-        path.mkdir(parents=True, exist_ok=True)
-        path = path.joinpath(layer_num + ".jpg")
+
+        if layer is None and layer_num is None:
+            path.mkdir(parents=True, exist_ok=True)
+            path = path.joinpath(model + ".png")
+        else: 
+            path = path.joinpath(model).joinpath(layer)
+            path.mkdir(parents=True, exist_ok=True)
+            path = path.joinpath(layer_num + ".png")
 
         plt.savefig(path)
         plt.clf()
@@ -117,3 +124,30 @@ class Visual(ABC):
             visual_layers[model] = layers
 
         return visual_layers
+
+
+    def activations_2D(self, array: np.ndarray | torch.Tensor) -> list[np.ndarray]:
+        """Decomposes larger dimension arrays into all its 2D arrays.
+
+        Args:
+            array: array to get 2D arrays from.
+
+        Returns:
+            list of 2D numpy arrays contained in larger dimension array.
+        """
+        if isinstance(array, torch.Tensor):
+            array = array.squeeze()
+            array = array.detach().cpu().numpy()
+
+        activations = []
+
+        if len(array.shape) == 2:
+            return array
+        
+        if len(array.shape) == 1:
+            return [array]
+            
+        for i in range(array.shape[0]):
+            activations.append(self.activations_2D(array[i]))
+        
+        return activations

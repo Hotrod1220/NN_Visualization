@@ -6,6 +6,7 @@ from torchvision import transforms
 
 from model import Model
 from heatmap import Heatmap
+from heatmaps import Heatmaps
 from visualization import Visualization
 
 if __name__ == '__main__':
@@ -42,7 +43,7 @@ if __name__ == '__main__':
 
         model_input.append(info)
 
-    visual = Heatmap()
+    visual = Heatmaps()
     visualization = Visualization(model, model_input, visual)
     visualization.visualize()
     

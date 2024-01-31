@@ -79,26 +79,3 @@ class Heatmap(Visual):
             )
         else:
             sns.heatmap(data, square = True)
-        
-
-    def activations_2D(self, array: np.array) -> list[np.array]:
-        """Decomposes larger dimension arrays into all its 2D arrays.
-
-        Args:
-            array: array to get 2D arrays from.
-
-        Returns:
-            list of 2D numpy arrays contained in larger dimension array.
-        """
-        activations = []
-
-        if len(array.shape) == 2:
-            return array
-        
-        if len(array.shape) == 1:
-            return [array]
-            
-        for i in range(array.shape[0]):
-            activations.append(self.activations_2D(array[i]))
-        
-        return activations

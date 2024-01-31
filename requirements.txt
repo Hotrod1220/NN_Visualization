@@ -3,4 +3,5 @@ matplotlib
 numpy
 pathlib
 seaborn
+scipy
 torch
