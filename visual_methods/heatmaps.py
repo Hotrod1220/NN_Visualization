@@ -50,6 +50,10 @@ class Heatmaps(Visual):
                 print(f"Visualizing layer: {name}")
 
                 activations = self.activations_2D(activation)
+
+                if not isinstance(activations, list):
+                    activations = [activations]
+
                 self.plot(name, activations, subfigs[i])
 
                 i += 1
@@ -80,6 +84,10 @@ class Heatmaps(Visual):
 
         for name, activation in data.items():
             activations = self.activations_2D(activation)
+
+            if not isinstance(activations, list):
+                activations = [activations]
+
             layer_rows, _ = self.dimensions(activations)
             total += layer_rows
 
@@ -87,7 +95,7 @@ class Heatmaps(Visual):
                 max_rows = layer_rows
                 max_layer = name
 
-        if total > 15:
+        if total > 14:
             print(
                 "\nModel / layer contains too many heatmaps "
                 "for single summary plot.\n"
@@ -132,9 +140,15 @@ class Heatmaps(Visual):
             ratios = [10, 1]
 
         fig = plt.figure(figsize = (20, 12))
+        
+        new_title = f"{title}, File: {file}"
+        if len(new_title) > 24:
+            new_title = f"{title}\nFile: {file}"
+
         fig.suptitle(
-            f"{title}, File: {file}",
+            new_title,
             x = 0.07,
+            y = 0.99,
             fontsize = 'x-large'
         )
 
@@ -185,7 +199,6 @@ class Heatmaps(Visual):
             sns.heatmap(
                 layer,
                 cbar = False,
-                square = True,
                 ax = ax
             )
 

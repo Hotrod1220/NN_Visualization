@@ -45,7 +45,11 @@ class Visualization:
 
     @property
     def data(self):
-        """Data for input into model and visualization methods."""
+        """Data for input into model and visualization methods.
+        
+        Data must be a list of dictionaries with 'data' and 'file' keys.
+        'data' is model-ready input, 'file' is a file string.
+        """
         return self._data
 
 
@@ -160,7 +164,8 @@ class Visualization:
                     name.find('Softmax') == -1 and
                     name.find('Softmin') == -1 and
                     name.find('Tanh') == -1 and
-                    name.find('Hard') == -1
+                    name.find('Hard') == -1 and
+                    name.find('Norm') == -1
                 )
 
                 if not_dropout and not_container and not_activation:
@@ -206,6 +211,15 @@ class Visualization:
             Activations of different layers.
         """
         def hook(model, input, output):
-            activation[name] = output.detach()
+            if not torch.is_tensor(output):
+                activation[name] = output[0].detach()
+                
+                if torch.is_tensor(output[1]):
+                    activation[name + '_feature2'] = output[1].detach()
+                else:
+                    activation[name + '_feature2'] = output[1][0].detach()
+                    activation[name + '_feature3'] = output[1][1].detach()
+            else:
+                activation[name] = output.detach()
         
         return hook, activation

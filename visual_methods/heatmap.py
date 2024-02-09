@@ -49,6 +49,9 @@ class Heatmap(Visual):
 
                 activations = self.activations_2D(activation)
 
+                if not isinstance(activations, list):
+                    activations = [activations]
+
                 layer_num = 1
                 for values in activations:
                     self.plot_heatmap(values)
@@ -78,4 +81,4 @@ class Heatmap(Visual):
                 cbar_kws={"orientation": "horizontal"}
             )
         else:
-            sns.heatmap(data, square = True)
+            sns.heatmap(data)

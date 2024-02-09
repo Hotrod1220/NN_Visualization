@@ -56,7 +56,11 @@ class Visual(ABC):
             layer: name of layer the figure was created for.
             layer_num: number for layers with multiple activation maps.
         """
-        file = "file_" + file[:file.find('.')]
+        ext = file[:file.find('.')]
+        if ext != '':
+            file = "file_" + ext
+        else:
+            file = "file_" + file
 
         path = Path.cwd().joinpath('Visualization')
         path = path.joinpath(self.folder).joinpath(file)
@@ -141,11 +145,8 @@ class Visual(ABC):
 
         activations = []
 
-        if len(array.shape) == 2:
+        if len(array.shape) <= 2:
             return array
-        
-        if len(array.shape) == 1:
-            return [array]
             
         for i in range(array.shape[0]):
             activations.append(self.activations_2D(array[i]))
