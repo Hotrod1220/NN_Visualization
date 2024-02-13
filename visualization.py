@@ -98,6 +98,11 @@ class Visualization:
 
             self.input_model(model_data, name)
 
+            activations = {
+                key: value
+                for key, value in activations.items()
+                if len(value) != 0
+            }
             entry['activations'] = activations
             self.visual.visualize(entry)
 
@@ -143,50 +148,36 @@ class Visualization:
         activation = {}
 
         for name, layer in self.model.named_modules():
-            # TODO Check in future if name != '' will cause problems with other models.
+            if name == "":
+                is_model = True
+                is_layer = False
+            else:
+                is_model, is_layer = self.check_layer(layer)
 
-            if name != '':
+            if is_layer:
                 name = str(layer)
                 name = name[:name.find('(')]
                 
-                not_dropout = name.find('Dropout') == -1
-                
-                not_container = (
-                    name.find('Sequential') == -1 and
-                    name.find('Module') == -1 and
-                    name.find('Parameter') == -1
-                )
-                
-                not_activation = (
-                    name.find('ReLU') == -1 and
-                    name.find('Sigmoid') == -1 and
-                    name.find('ELU') == -1 and
-                    name.find('Softmax') == -1 and
-                    name.find('Softmin') == -1 and
-                    name.find('Tanh') == -1 and
-                    name.find('Hard') == -1 and
-                    name.find('Norm') == -1
-                )
+                if name in names:
+                    names[name] += 1
+                else:
+                    names[name] = 1
 
-                if not_dropout and not_container and not_activation:
-                    if name in names:
-                        names[name] += 1
-                    else:
-                        names[name] = 1
+                name += '_' + str(names[name])
 
-                    name += '_' + str(names[name])
-
-                    hook, activation = self.get_activation(name, activation)
-                    layer.register_forward_hook(hook)
-            else:
+                hook, activation = self.get_activation(name, activation)
+                layer.register_forward_hook(hook)
+            elif is_model:
                 if model_name == '':
                     model_name = str(layer)
 
                 else:
                     model_name = model_name[:model_name.find('(')]
                     models[model_name] = activation
+                    activation = {}
+                    names = {}
 
-                    model_name = str(layer)
+                    model_name = str(layer)                
 
         model_name = model_name[:model_name.find('(')]
         models[model_name] = activation
@@ -223,3 +214,74 @@ class Visualization:
                 activation[name] = output.detach()
         
         return hook, activation
+    
+    def check_layer(self, name: torch.nn.Module) -> tuple[bool, bool]:
+        """Determines if a module is a model or a layer worth visualizing.
+
+        Args:
+            name: Module name used to determine type.
+
+        Returns:
+            True, False if it is a model.
+            False, True if it is a layer to visualize.
+            False, False otherwise.
+        """
+        name = str(name)
+        name = name[:name.find('(')]
+                
+        container = (
+            name.find('Sequential') != -1 or
+            name.find('Module') != -1 or
+            name.find('Parameter') != -1 or 
+            name.find('Buffer') != -1 or 
+            name.find('Dropout') != -1 or
+            name.find('Loss') != -1
+        )
+        
+        activation = (
+            name.find('ReLU') != -1 or
+            name.find('Sigmoid') != -1 or
+            name.find('ELU') != -1 or
+            name.find('Soft') != -1 or
+            name.find('Tanh') != -1 or
+            name.find('Hard') != -1 or
+            name.find('Norm') != -1 or
+            name.find('SiLU') != -1 or
+            name.find('Mish') != -1 or
+            name.find('GLU') != -1 or
+            name.find('Attention') != -1
+        )
+
+        other = (
+            name.find('Threshold') != -1 or
+            name.find('Pad') != -1 or
+            name.find('Unsampl') != -1 or
+            name.find('Pixel') != -1 or
+            name.find('Shuffle') != -1 or
+            name.find('Parallel') != -1 or
+            name.find('Identity') != -1 or
+            name.find('Embedding') != -1 or
+            name.find('Cosine') != -1 or
+            name.find('Distance') != -1 or 
+            name.find('Unfold') != -1 or 
+            name.find('Fold') != -1
+        )
+
+        if container or activation or other:
+            return False, False
+        
+        layer = (
+            name.find('Pool') != -1 or
+            name.find('pool') != -1 or
+            name.find('Conv') != -1 or
+            name.find('RNN') != -1 or
+            name.find('LSTM') != -1 or
+            name.find('GRU') != -1 or
+            name.find('Transformer') != -1 or 
+            name.find('Linear') != -1 or 
+            name.find('linear') != -1
+        )
+
+        model = not layer
+
+        return model, layer

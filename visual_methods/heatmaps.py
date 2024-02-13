@@ -42,7 +42,7 @@ class Heatmaps(Visual):
         for model, layers in data['activations'].items():
             print(f"\nVisualizing model: {model}")
             
-            self.correct_dimension(layers, data['file'])
+            self.correct_dimension(layers, data['file'], model)
             subfigs = self.init_plot(data['file'], model, layers)
             
             i = 0
@@ -67,7 +67,8 @@ class Heatmaps(Visual):
     def correct_dimension(
         self,
         data: dict[str, dict[str, torch.Tensor]],
-        file: str
+        file: str,
+        model: str
     ) -> None:
         """Reduces layers in model if there are too many to visualize.
 
@@ -77,6 +78,7 @@ class Heatmaps(Visual):
         Args:
             data: Model / layer data.
             file: File name.
+            model: Model name.
         """
         total = 0
         max_rows = 0
@@ -105,10 +107,10 @@ class Heatmaps(Visual):
             
             new_data['file'] = file
             new_layer = {" " : layer}
-            new_data['activations'] = {max_layer : new_layer}
+            new_data['activations'] = {f"{model}_{max_layer}" : new_layer}
 
             self.visualize(new_data)
-            self.correct_dimension(data, file)
+            self.correct_dimension(data, file, model)
 
 
     def init_plot(
