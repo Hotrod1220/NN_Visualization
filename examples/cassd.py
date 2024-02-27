@@ -4,11 +4,16 @@ import numpy as np
 from pathlib import Path
 from PIL import Image
 
+import os
+import sys
+current = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(current))
+
 from visual_methods.heatmap import Heatmap
 from visual_methods.heatmaps import Heatmaps
 from visualization import Visualization
 
-if __name__ == '__main__':
+def main():
     """
     Neural network visualizer tested with multiple MNIST 
     digit localizer and classifier. 
@@ -38,3 +43,6 @@ if __name__ == '__main__':
     visual = Heatmaps()
     visualization = Visualization(model, [info], visual)
     visualization.visualize()
+
+if __name__ == '__main__':
+    main()

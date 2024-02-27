@@ -1,6 +1,9 @@
 inquirer
 matplotlib
+natsort
 numpy
+imageio
+--upgrade imageio-ffmpeg
 pathlib
 seaborn
 scipy

@@ -4,20 +4,25 @@ from pathlib import Path
 from PIL import Image
 from torchvision import transforms
 
-from model.rnn import RNN
+import os
+import sys
+current = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(current))
+
+from model.model import Model
 from visual_methods.heatmap import Heatmap
 from visual_methods.heatmaps import Heatmaps
 from visualization import Visualization
 
-if __name__ == '__main__':
+def main():
     """
-    Neural network visualizer tested with RNN MNIST digit classifier. 
+    Neural network visualizer tested with MNIST digit classifier. 
     """
     current = Path.cwd()
-    path = current.joinpath('state/rnn.pth')
+    path = current.joinpath('state/model.pth')
     state = torch.load(path)
 
-    model = RNN()
+    model = Model()
     model.load_state_dict(state)
     model.eval()
 
@@ -33,6 +38,7 @@ if __name__ == '__main__':
         image = transform(image)
         image = image.float()
         image /= 255
+        image = image.unsqueeze(0)
 
         info = {
             'file' : name,
@@ -45,4 +51,6 @@ if __name__ == '__main__':
     visual = Heatmaps()
     visualization = Visualization(model, model_input, visual)
     visualization.visualize()
-    
+
+if __name__ == "__main__":
+    main()

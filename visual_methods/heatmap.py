@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import seaborn as sns
 import numpy as np
 
@@ -14,17 +15,24 @@ class Heatmap(Visual):
     Attributes:
         visual: Allows for other forms of visualization.
         folder: Used to save different forms of visualization.
+        video: Whether video is wanted for some visualizations.
         layers: Layers selected for visualization.
     """
 
-    def __init__(self, visual: Visual = None, folder: str = "Heatmap"):
+    def __init__(
+        self,
+        visual: Visual = None,
+        folder: str = "Heatmap",
+        video: bool = False
+    ):
         """Intializes visualization methods and folders.
 
         Args:
             visual: Allows for other forms of visualization.
-            folder: Used to save different forms of visualization.  
+            folder: Used to save different forms of visualization.
+            video: Whether video is wanted for some visualizations.
         """
-        super().__init__(visual, folder)
+        super().__init__(visual, folder, video)
         self._layers = None
 
 
@@ -34,6 +42,8 @@ class Heatmap(Visual):
         Args:
             data: file name, model and layer data, and other attributes.
         """
+        visual_data = copy.deepcopy(data)
+
         if self._layers is None:
             self._layers = self.select_layers(data)
 
@@ -54,7 +64,14 @@ class Heatmap(Visual):
 
                 layer_num = 1
                 for values in activations:
-                    self.plot_heatmap(values)
+                    if name == "Output":
+                        try:
+                            self.plot_heatmap(values, data['labels'])
+                        except KeyError:
+                            self.plot_heatmap(values)
+                    else:
+                        self.plot_heatmap(values)
+
                     self.save(
                         data['file'],
                         model,
@@ -62,23 +79,35 @@ class Heatmap(Visual):
                         f"layer_{layer_num}"
                     )
                     
-                    layer_num += 1 
+                    layer_num += 1
+
+        self.save_videos(data)
 
         if self.visual is not None:
-            self.visual.visualize(data)
+            self.visual.visualize(visual_data)
 
 
-    def plot_heatmap(self, data: np.array) -> None:
+    def plot_heatmap(self, data: np.array, labels: list = None) -> None:
         """Plots the data into a heatmap.
 
         Args:
             data: 1D or 2D np.array used for heatmap visualization.
+            labels: labels used for the output layer.
         """
-        if len(data.shape) == 1:
-            sns.heatmap(
-                [data],
-                square = True,
-                cbar_kws={"orientation": "horizontal"}
-            )
+        if labels is not None:
+            if len(data.shape) == 1:
+                sns.heatmap(
+                    [data],
+                    xticklabels=labels,
+                    cbar_kws={"orientation": "horizontal"}
+                )
+            else:
+                sns.heatmap(data, xticklabels=labels)
         else:
-            sns.heatmap(data)
+            if len(data.shape) == 1:
+                sns.heatmap(
+                    [data],
+                    cbar_kws={"orientation": "horizontal"}
+                )
+            else:
+                sns.heatmap(data)

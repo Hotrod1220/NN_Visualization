@@ -13,23 +13,29 @@ from visualize import Visual
 class Heatmaps(Visual):
     """Visualizes neural network activation layers with a heatmap.
 
-    Generates heatmap for each layer, saves all heatmaps 
+    Generates heatmap for each layer, saves all heatmaps
     onto one figure.
 
     Attributes:
         visual: Allows for other forms of visualization.
         folder: Used to save different forms of visualization.
+        video: Whether video is wanted for some visualizations.
     """
 
-    def __init__(self, visual: Visual = None, folder: str = "Heatmaps"):
+    def __init__(
+        self,
+        visual: Visual = None,
+        folder: str = "Heatmaps",
+        video: bool = False
+    ):
         """Intializes visualization methods and folders.
 
         Args:
             visual: Allows for other forms of visualization.
-            folder: Used to save different forms of visualization.  
+            folder: Used to save different forms of visualization.
+            video: Whether video is wanted for some visualizations.
         """
-        super().__init__(visual, folder)
-
+        super().__init__(visual, folder, video)
 
     def visualize(self, data: dict[str, dict[str, torch.Tensor]]) -> None:
         """Visualizes selected neural network layers with heatmaps.
@@ -39,12 +45,12 @@ class Heatmaps(Visual):
         """
         visual_data = copy.deepcopy(data)
 
-        for model, layers in data['activations'].items():
+        for model, layers in data["activations"].items():
             print(f"\nVisualizing model: {model}")
-            
-            self.correct_dimension(layers, data['file'], model)
-            subfigs = self.init_plot(data['file'], model, layers)
-            
+
+            layers = self.correct_dimension(layers, data["file"], model)
+            subfigs = self.init_plot(data["file"], model, layers)
+
             i = 0
             for name, activation in layers.items():
                 print(f"Visualizing layer: {name}")
@@ -57,31 +63,32 @@ class Heatmaps(Visual):
                 self.plot(name, activations, subfigs[i])
 
                 i += 1
+
+            self.save(data["file"], model)
         
-            self.save(data['file'], model)
-        
+        self.save_videos(data)
+
         if self.visual is not None:
             self.visual.visualize(visual_data)
 
-
     def correct_dimension(
-        self,
-        data: dict[str, dict[str, torch.Tensor]],
-        file: str,
-        model: str
-    ) -> None:
+        self, data: dict[str, dict[str, torch.Tensor]], file: str, model: str
+    ) -> dict[str, dict[str, torch.Tensor]]:
         """Reduces layers in model if there are too many to visualize.
 
-        If there are too many layers present, layer with the most 
-        data is removed and visualized individually.
+        If there are too many layers present, layers are sliced into
+        two different groups.
 
         Args:
             data: Model / layer data.
             file: File name.
             model: Model name.
+
+        Returns:
+            data: Model / layer data sliced into correct dimension.
         """
         total = 0
-        max_rows = 0
+        index = 0
         new_data = {}
 
         for name, activation in data.items():
@@ -93,31 +100,21 @@ class Heatmaps(Visual):
             layer_rows, _ = self.dimensions(activations)
             total += layer_rows
 
-            if max_rows < layer_rows:
-                max_rows = layer_rows
-                max_layer = name
+            if total > 14:
+                new_layers = {f"{model}_2": dict(list(data.items())[index:])}
+                new_data["activations"] = new_layers
+                new_data["file"] = file
+                data = dict(list(data.items())[:index])
 
-        if total > 14:
-            print(
-                "\nModel / layer contains too many heatmaps "
-                "for single summary plot.\n"
-                f"Visualizng {max_layer} on another summary plot."
-            )
-            layer = data.pop(max_layer)
-            
-            new_data['file'] = file
-            new_layer = {" " : layer}
-            new_data['activations'] = {f"{model}_{max_layer}" : new_layer}
+                self.visualize(new_data)
+                return data
 
-            self.visualize(new_data)
-            self.correct_dimension(data, file, model)
-
+            index += 1
+        
+        return data
 
     def init_plot(
-        self, 
-        file: str,
-        title: str,
-        layers: dict[str, torch.Tensor]
+        self, file: str, title: str, layers: dict[str, torch.Tensor]
     ) -> np.ndarray:
         """Initializes the plot for a model.
 
@@ -141,27 +138,17 @@ class Heatmaps(Visual):
             rows = 2
             ratios = [10, 1]
 
-        fig = plt.figure(figsize = (20, 12))
-        
+        fig = plt.figure(figsize=(20, 12))
+
         new_title = f"{title}, File: {file}"
         if len(new_title) > 24:
             new_title = f"{title}\nFile: {file}"
 
-        fig.suptitle(
-            new_title,
-            x = 0.07,
-            y = 0.99,
-            fontsize = 'x-large'
-        )
+        fig.suptitle(new_title, x=0.06, y=0.995, fontsize="x-large")
 
-        subfigs = fig.subfigures(
-            rows,
-            columns,
-            height_ratios = ratios
-        )
+        subfigs = fig.subfigures(rows, columns, height_ratios=ratios)
 
         return subfigs
-
 
     def plot(
         self,
@@ -179,12 +166,14 @@ class Heatmaps(Visual):
         layer_rows, layer_columns = self.dimensions(activations)
 
         subaxes = subplot.subplots(layer_rows, layer_columns)
-        subplot.suptitle(title, x = 0.05, y = 0.5)
+
+        x = 0.06 if len(title) > 24 else 0.05
+        subplot.suptitle(title, x=x, y=0.45)
 
         if isinstance(subaxes, np.ndarray):
             subaxes = subaxes.flatten()
             for ax in subaxes:
-                ax.axis('off')
+                ax.axis("off")
 
         i = 0
 
@@ -193,19 +182,14 @@ class Heatmaps(Visual):
                 ax = subaxes[i]
             else:
                 ax = subaxes
-            ax.axis('off')
+            ax.axis("off")
 
             if len(layer.shape) == 1:
                 layer = [layer]
-            
-            sns.heatmap(
-                layer,
-                cbar = False,
-                ax = ax
-            )
+
+            sns.heatmap(layer, cbar=False, ax=ax)
 
             i += 1
-
 
     def dimensions(self, activations: list[np.ndarray]) -> tuple(int, int):
         """Determines the number rows and columns needed to plot activations.
@@ -223,11 +207,10 @@ class Heatmaps(Visual):
             rows = 1
 
         return rows, columns
-    
 
     def ratios(self, layers: dict[str, torch.Tensor]) -> list[int]:
         """Determines vertical ratios needed for different layers.
-        
+
         Layers that require more rows are given more vertical space.
 
         Args:

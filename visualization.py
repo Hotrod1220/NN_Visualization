@@ -28,7 +28,7 @@ class Visualization:
         self,
         model: Any,
         model_input: list[dict],
-        visual: Visual = None
+        visual: Visual = None,
     ):
         """Intializes model, input for model and the visualization methods.
 
@@ -97,17 +97,13 @@ class Visualization:
             print(f"\nVisualizing file: {name}")
 
             self.input_model(model_data, name)
-
-            activations = {
-                key: value
-                for key, value in activations.items()
-                if len(value) != 0
-            }
+            activations = self.normalize(activations)
+            
             entry['activations'] = activations
             self.visual.visualize(entry)
 
 
-    def input_model(self, data: torch.Tensor, name: str) -> None:
+    def input_model(self, data: torch.Tensor | tuple, name: str) -> None:
         """Inputs data into the model.
 
         Args:
@@ -119,7 +115,10 @@ class Visualization:
                 unsuccessful.
         """
         try:
-            _ = self.model(data)
+            if isinstance(data, tuple):
+                _ = self.model(*data)
+            else:
+                _ = self.model(data)
 
         except (RuntimeError, TypeError, NameError) as error:
             raise Exception(
@@ -144,6 +143,7 @@ class Visualization:
         """
         model_name = ''
         models = {}
+        dup_models = {}
         names = {}
         activation = {}
 
@@ -168,11 +168,17 @@ class Visualization:
                 hook, activation = self.get_activation(name, activation)
                 layer.register_forward_hook(hook)
             elif is_model:
-                if model_name == '':
+                if model_name == "":
                     model_name = str(layer)
 
                 else:
                     model_name = model_name[:model_name.find('(')]
+                    
+                    if model_name in models:
+                        dup_models[model_name] += 1
+                        model_name = f"{model_name}_{dup_models[model_name]}"
+                    
+                    dup_models[model_name] = 1
                     models[model_name] = activation
                     activation = {}
                     names = {}
@@ -180,6 +186,10 @@ class Visualization:
                     model_name = str(layer)                
 
         model_name = model_name[:model_name.find('(')]
+        if model_name in models:
+            dup_models[model_name] += 1
+            model_name = f"{model_name}_{dup_models[model_name]}"
+        
         models[model_name] = activation
 
         return models
@@ -204,29 +214,64 @@ class Visualization:
         def hook(model, input, output):
             if not torch.is_tensor(output):
                 activation[name] = output[0].detach()
-                
-                if torch.is_tensor(output[1]):
-                    activation[name + '_feature2'] = output[1].detach()
-                else:
-                    activation[name + '_feature2'] = output[1][0].detach()
-                    activation[name + '_feature3'] = output[1][1].detach()
+
+                if output[1] is not None:                
+                    if torch.is_tensor(output[1]):
+                        activation[name + '_feature2'] = output[1].detach()
+                    else:
+                        activation[name + '_feature2'] = output[1][0].detach()
+                        activation[name + '_feature3'] = output[1][1].detach()
             else:
                 activation[name] = output.detach()
         
         return hook, activation
     
-    def check_layer(self, name: torch.nn.Module) -> tuple[bool, bool]:
+
+    def normalize(
+            self,
+            activations: dict[str, dict[str, torch.tensor]]
+        ) -> dict[str, dict[str, torch.tensor]]:
+        """Normalizes network layers, removes models without tensors.
+
+        Args:
+            activations: Model layer data.
+
+        Returns:
+            activations with normalized layers.
+        
+        """
+        last_key = list(activations)[-1]
+        last = list(activations[last_key])[-1]
+
+        activations[last_key]["Output"] = activations[last_key][last]
+        del activations[last_key][last]
+
+        activations = {
+            key: value
+            for key, value in activations.items()
+            if len(value) != 0
+        }
+
+        for model, layer in activations.items():
+            for name, tensor in layer.items():
+                tensor -= tensor.min()
+                tensor /= tensor.max()
+        
+        return activations
+
+    
+    def check_layer(self, module: torch.nn.Module) -> tuple[bool, bool]:
         """Determines if a module is a model or a layer worth visualizing.
 
         Args:
-            name: Module name used to determine type.
+            module: Module name used to determine type.
 
         Returns:
             True, False if it is a model.
             False, True if it is a layer to visualize.
             False, False otherwise.
-        """
-        name = str(name)
+        """        
+        name = str(module)
         name = name[:name.find('(')]
                 
         container = (
@@ -254,11 +299,12 @@ class Visualization:
 
         other = (
             name.find('Threshold') != -1 or
-            name.find('Pad') != -1 or
+            name.find('Pad1d') != -1 or
+            name.find('Pad2d') != -1 or
+            name.find('Pad3d') != -1 or
             name.find('Unsampl') != -1 or
-            name.find('Pixel') != -1 or
-            name.find('Shuffle') != -1 or
-            name.find('Parallel') != -1 or
+            name.find('huffle') != -1 or
+            name.find('DataParallel') != -1 or
             name.find('Identity') != -1 or
             name.find('Embedding') != -1 or
             name.find('Cosine') != -1 or
@@ -271,15 +317,23 @@ class Visualization:
             return False, False
         
         layer = (
-            name.find('Pool') != -1 or
-            name.find('pool') != -1 or
-            name.find('Conv') != -1 or
-            name.find('RNN') != -1 or
-            name.find('LSTM') != -1 or
-            name.find('GRU') != -1 or
-            name.find('Transformer') != -1 or 
-            name.find('Linear') != -1 or 
-            name.find('linear') != -1
+            name.find('ool1d') != -1 or
+            name.find('ool2d') != -1 or
+            name.find('ool3d') != -1 or
+            name.find('Conv1d') != -1 or
+            name.find('Conv2d') != -1 or
+            name.find('Conv3d') != -1 or
+            name.find('ConvTranspose') != -1 or
+            name.find('ConvLayerBlock') != -1 or
+            name.find('TransformerEncoder') != -1 or
+            name.find('TransformerDecoder') != -1 or
+            isinstance(module, torch.nn.Linear) or
+            isinstance(module, torch.nn.Bilinear) or
+            isinstance(module, torch.nn.LazyLinear) or
+            isinstance(module, torch.nn.Transformer) or
+            isinstance(module, torch.nn.RNN) or
+            isinstance(module, torch.nn.GRU) or
+            isinstance(module, torch.nn.LSTM)
         )
 
         model = not layer
