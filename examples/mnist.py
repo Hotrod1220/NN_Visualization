@@ -43,7 +43,8 @@ def main():
         info = {
             'file' : name,
             'data' : image,
-            'digit' : i
+            'digit' : i,
+            'labels' : [j for j in range(10)]
         }
 
         model_input.append(info)

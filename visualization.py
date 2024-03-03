@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import torch
 
+from copy import deepcopy
 from visualize import Visual
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing_extensions import Any, Callable
+    from typing_extensions import Callable
 
 
 class Visualization:
@@ -26,7 +27,7 @@ class Visualization:
 
     def __init__(
         self,
-        model: Any,
+        model: torch.nn.Module,
         model_input: list[dict],
         visual: Visual = None,
     ):
@@ -54,7 +55,7 @@ class Visualization:
 
 
     @data.setter
-    def data(self, obj):
+    def data(self, obj: dict):
         try:
             correct_format = all(
                 item['data'] is not None and 
@@ -141,11 +142,12 @@ class Visualization:
                     'Model2' : {'Layer_1' : Tensor(...), 'Layer_2' : Tensor(...)}
                 }
         """
-        model_name = ''
         models = {}
         dup_models = {}
-        names = {}
         activation = {}
+        model_activations = {}
+        names = {}
+        model_names = {}
 
         for name, layer in self.model.named_modules():
             if name == "":
@@ -154,52 +156,49 @@ class Visualization:
             else:
                 is_model, is_layer = self.check_layer(layer)
 
+            if not is_model and not is_layer:
+                continue
+            
             if is_layer:
-                name = str(layer)
-                name = name[:name.find('(')]
+                find_name = name[::-1]
+                model = self.find_model(find_name, models, dup_models)
                 
-                if name in names:
-                    names[name] += 1
-                else:
-                    names[name] = 1
+                if model not in model_names:
+                    model_names[model] = deepcopy(names)
+                extra = model_names[model]
+            else:
+                extra = dup_models
 
-                name += '_' + str(names[name])
+            module_name = str(layer)
+            module_name = module_name[:module_name.find('(')]
 
-                hook, activation = self.get_activation(name, activation)
+            if module_name in extra:
+                extra[module_name] += 1
+                module_name = f"{module_name}_{extra[module_name]}"
+            else:
+                extra[module_name] = 1
+
+            if is_model:
+                models[name] = module_name
+                model_activations[module_name] = deepcopy(activation)
+            else:
+                activation = model_activations[model]
+
+                hook, activation = self.get_activation(module_name, activation)
                 layer.register_forward_hook(hook)
-            elif is_model:
-                if model_name == "":
-                    model_name = str(layer)
-
-                else:
-                    model_name = model_name[:model_name.find('(')]
-                    
-                    if model_name in models:
-                        dup_models[model_name] += 1
-                        model_name = f"{model_name}_{dup_models[model_name]}"
-                    
-                    dup_models[model_name] = 1
-                    models[model_name] = activation
-                    activation = {}
-                    names = {}
-
-                    model_name = str(layer)                
-
-        model_name = model_name[:model_name.find('(')]
-        if model_name in models:
-            dup_models[model_name] += 1
-            model_name = f"{model_name}_{dup_models[model_name]}"
         
-        models[model_name] = activation
+        activation = model_activations[model]
+        hook, activation = self.get_activation("Output", activation)
+        layer.register_forward_hook(hook)
 
-        return models
+        return model_activations
 
 
     def get_activation(
             self,
             name: str,
             activation: dict[str, torch.Tensor]
-        ) -> tuple(Callable, dict):
+        ) -> tuple(Callable, dict[str, torch.Tensor]):
         """Retrieves the activation layer values from a hook.
 
         Args:
@@ -238,14 +237,7 @@ class Visualization:
 
         Returns:
             activations with normalized layers.
-        
         """
-        last_key = list(activations)[-1]
-        last = list(activations[last_key])[-1]
-
-        activations[last_key]["Output"] = activations[last_key][last]
-        del activations[last_key][last]
-
         activations = {
             key: value
             for key, value in activations.items()
@@ -256,8 +248,52 @@ class Visualization:
             for name, tensor in layer.items():
                 tensor -= tensor.min()
                 tensor /= tensor.max()
-        
+
+        for model_name, model in activations.items():
+            for layer, value in model.items():
+                if layer == 'Output':
+                    for other, value2 in model.items():
+                        if torch.all(value.eq(value2)):
+                            del activations[model_name][other]
+                            return activations
         return activations
+    
+
+    def find_model(
+            self,
+            name: str,
+            models: dict[str, str],
+            duplicate: dict[str, int]
+        ) -> str:
+        """
+        Give a layer name, finds model it is apart of.
+
+        name is all models the layer is in separated by '.'s,
+        finds first model iterating from the back of the name.
+
+        Args:
+            name: layer name.
+            models: links layer to models.
+            duplicate: keeps track of duplicate models.
+
+        Returns:
+            model name for model that layer is apart of.
+        """
+        idx = name.find('.')
+        
+        if idx == -1:
+            return models[list(models)[0]]
+        
+        model_name = name[idx + 1:][::-1]
+        
+        if model_name in models:
+            if model_name in duplicate:
+                duplicate[model_name] += 1
+                model_name = f"{model_name}_{duplicate[model_name]}"   
+            
+            return models[model_name]
+        else:
+            return self.find_model(name[idx + 1:], models, duplicate)
 
     
     def check_layer(self, module: torch.nn.Module) -> tuple[bool, bool]:
@@ -294,7 +330,7 @@ class Visualization:
             name.find('SiLU') != -1 or
             name.find('Mish') != -1 or
             name.find('GLU') != -1 or
-            name.find('Attention') != -1
+            name.find('MultiheadAttention') != -1
         )
 
         other = (

@@ -5,6 +5,8 @@ import math
 import torch
 import seaborn as sns
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from visualize import Visual
@@ -19,23 +21,21 @@ class Heatmaps(Visual):
     Attributes:
         visual: Allows for other forms of visualization.
         folder: Used to save different forms of visualization.
-        video: Whether video is wanted for some visualizations.
     """
 
     def __init__(
         self,
         visual: Visual = None,
-        folder: str = "Heatmaps",
-        video: bool = False
+        folder: str = "Heatmaps"
     ):
         """Intializes visualization methods and folders.
 
         Args:
             visual: Allows for other forms of visualization.
             folder: Used to save different forms of visualization.
-            video: Whether video is wanted for some visualizations.
         """
-        super().__init__(visual, folder, video)
+        super().__init__(visual, folder)
+
 
     def visualize(self, data: dict[str, dict[str, torch.Tensor]]) -> None:
         """Visualizes selected neural network layers with heatmaps.
@@ -60,16 +60,21 @@ class Heatmaps(Visual):
                 if not isinstance(activations, list):
                     activations = [activations]
 
-                self.plot(name, activations, subfigs[i])
+                output = 'labels' in data and name == 'Output'
+                if 'labels' in data and name == 'Output':
+                    self.plot(name, activations, subfigs[i], data['labels'])
+                else:
+                    self.plot(name, activations, subfigs[i])
 
                 i += 1
 
+                bottom = 0.2 if output else None
+                plt.subplots_adjust(bottom=bottom, right=1, top=1)
             self.save(data["file"], model)
         
-        self.save_videos(data)
-
         if self.visual is not None:
             self.visual.visualize(visual_data)
+
 
     def correct_dimension(
         self, data: dict[str, dict[str, torch.Tensor]], file: str, model: str
@@ -110,8 +115,9 @@ class Heatmaps(Visual):
                 return data
 
             index += 1
-        
+                
         return data
+
 
     def init_plot(
         self, file: str, title: str, layers: dict[str, torch.Tensor]
@@ -141,20 +147,24 @@ class Heatmaps(Visual):
         fig = plt.figure(figsize=(20, 12))
 
         new_title = f"{title}, File: {file}"
+        fontsize = "x-large"
         if len(new_title) > 24:
             new_title = f"{title}\nFile: {file}"
+            fontsize = "large"
 
-        fig.suptitle(new_title, x=0.06, y=0.995, fontsize="x-large")
+        fig.suptitle(new_title, x=0.06, y=0.995, fontsize=fontsize)
 
         subfigs = fig.subfigures(rows, columns, height_ratios=ratios)
 
         return subfigs
+
 
     def plot(
         self,
         title: str,
         activations: list[np.ndarray],
         subplot: plt.SubFigure,
+        labels: list[str | int] = None
     ) -> None:
         """Plots all the activations with heatmaps for a layer.
 
@@ -168,28 +178,40 @@ class Heatmaps(Visual):
         subaxes = subplot.subplots(layer_rows, layer_columns)
 
         x = 0.06 if len(title) > 24 else 0.05
-        subplot.suptitle(title, x=x, y=0.45)
+        subplot.suptitle(title, x=x, y=0.55)
+
+        output = title == "Output" and labels is not None
 
         if isinstance(subaxes, np.ndarray):
             subaxes = subaxes.flatten()
             for ax in subaxes:
-                ax.axis("off")
+                if not output:
+                    ax.axis("off")
 
         i = 0
-
         for layer in activations:
             if isinstance(subaxes, np.ndarray):
                 ax = subaxes[i]
             else:
                 ax = subaxes
-            ax.axis("off")
 
             if len(layer.shape) == 1:
                 layer = [layer]
 
-            sns.heatmap(layer, cbar=False, ax=ax)
+            if output:
+                sns.heatmap(
+                    layer,
+                    cbar=False,
+                    ax=ax,
+                    xticklabels=labels,
+                    yticklabels=False
+                )
+            else:
+                ax.axis("off")
+                sns.heatmap(layer, cbar=False, ax=ax)
 
             i += 1
+
 
     def dimensions(self, activations: list[np.ndarray]) -> tuple(int, int):
         """Determines the number rows and columns needed to plot activations.
@@ -207,6 +229,7 @@ class Heatmaps(Visual):
             rows = 1
 
         return rows, columns
+
 
     def ratios(self, layers: dict[str, torch.Tensor]) -> list[int]:
         """Determines vertical ratios needed for different layers.

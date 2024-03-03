@@ -11,11 +11,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from natsort import natsorted 
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from typing_extensions import Any
-
 
 class Visual(ABC):
     """Abstract class for different methods of visualizing neural networks.
@@ -26,29 +21,25 @@ class Visual(ABC):
     Attributes:
         visual: Allows for other forms of visualization.
         folder: Used to save different forms of visualization.
-        video: Whether video is wanted for some visualizations.
     """
 
     def __init__(
         self,
         visual: Visual = None,
         folder: str = None,
-        video: bool = False
     ):
         """Intializes visualization methods and folders.
 
         Args:
             visual: Allows for other forms of visualization.
             folder: Used to save different forms of visualization.
-            video: Whether video is wanted for some visualizations.  
         """
         self.visual = visual
         self.folder = folder
-        self.video = video
 
 
     @abstractmethod
-    def visualize(self, data: Any):
+    def visualize(self, data: dict[str, dict]):
         pass
 
 
@@ -89,7 +80,10 @@ class Visual(ABC):
         plt.clf()
 
 
-    def select_layers(self, data: list[dict]) -> dict[str, list[str]]:
+    def select_layers(
+            self,
+            data: dict[str, dict[str, torch.Tensor]]
+        ) -> dict[str, list[str]]:
         """Prompts the user to select the layers they would like to visualize.
 
         Args:
@@ -172,62 +166,61 @@ class Visual(ABC):
         Args:
             data: File name, model / layer data, and other attributes.
         """
-        if self.video:
-            path = Path.cwd().joinpath("Visualization")
-            path = path.joinpath(self.folder)
-            path = path.joinpath(f"file_{data['file']}")
+        path = Path.cwd().joinpath("Visualization")
+        path = path.joinpath(self.folder)
+        path = path.joinpath(f"file_{data['file']}")
 
-            models = list(data['activations'].keys())
-            models = [
-                model[:model.find('_')]
-                for model in models
-                if model.find('_') != -1
-            ]
+        models = list(data['activations'].keys())
+        models = [
+            model[:model.find('_')]
+            for model in models
+            if model.find('_') != -1
+        ]
 
-            dup = set()
-            models = [
-                model 
-                for model in models
-                if model in dup or dup.add(model)
-            ]  
+        dup = set()
+        models = [
+            model 
+            for model in models
+            if model in dup or dup.add(model)
+        ]  
 
-            for name in dup:
-                files = []
-                layers = {}
-                for file in os.listdir(path):
-                    if file.startswith(name):
-                        file_path = path.joinpath(file)
-                        if file_path.is_file():
-                            files.append(file_path)
-                        else:
-                            for p in file_path.rglob("*"):
-                                f_path = file_path.joinpath(p)
-                                if f_path.is_file() and f_path.suffix == '.png':
-                                    files.append(f_path)
-
-                for file in files:
-                    if file.parts[-2] not in layers:
-                        layers[file.parts[-2]] = [file]
+        for name in dup:
+            files = []
+            layers = {}
+            for file in os.listdir(path):
+                if file.startswith(name):
+                    file_path = path.joinpath(file)
+                    if file_path.is_file():
+                        files.append(file_path)
                     else:
-                        layers[file.parts[-2]].append(file)
+                        for p in file_path.rglob("*"):
+                            f_path = file_path.joinpath(p)
+                            if f_path.is_file() and f_path.suffix == '.png':
+                                files.append(f_path)
 
-                for folder, files in layers.items():
-                    if len(layers) > 1:
-                        new_path = path.joinpath(name)
-                    else:
-                        new_path = path
-                        folder = name
-                    if len(files) > 1:
-                        self.create_video(folder, files, new_path)
-        
-            folders = list(os.walk(path))[1:]
+            for file in files:
+                if file.parts[-2] not in layers:
+                    layers[file.parts[-2]] = [file]
+                else:
+                    layers[file.parts[-2]].append(file)
 
-            for folder in folders:
-                if not folder[1] and not folder[2]:
-                    os.rmdir(folder[0])
+            for folder, files in layers.items():
+                if len(layers) > 1:
+                    new_path = path.joinpath(name)
+                else:
+                    new_path = path
+                    folder = name
+                if len(files) > 1:
+                    self.create_video(folder, files, new_path)
+    
+        folders = list(os.walk(path))[1:]
+
+        for folder in folders:
+            if not folder[1] and not folder[2]:
+                os.rmdir(folder[0])
 
 
-    def create_video(self, name: str, files: list, path: Path) -> None:
+    def create_video(self, name: str, files: list[Path], path: Path) -> None:
         """Creates a video from list of image files.
          
         Args:

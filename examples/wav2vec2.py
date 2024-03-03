@@ -55,7 +55,7 @@ def main():
         'labels' : bundle.get_labels()
     }
 
-    visual = Heatmaps(video = True)
+    visual = Heatmaps()
     visualization = Visualization(model, [info], visual)
     visualization.visualize()
 

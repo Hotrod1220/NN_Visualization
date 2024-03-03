@@ -35,13 +35,13 @@ def main():
     model_input = []
     SOS_token = 2
 
-    for i, example in enumerate(examples):
+    for example in examples:
         y_input = torch.tensor([[SOS_token]], dtype=torch.long, device=device)
 
         tgt_mask = model.get_tgt_mask(y_input.size(1)).to(device)
             
         info = {
-            'file' : f"Ex_{i}",
+            'file' : "simple_transformer",
             'data' : (example, y_input, tgt_mask)
         }
 

@@ -15,7 +15,6 @@ class Heatmap(Visual):
     Attributes:
         visual: Allows for other forms of visualization.
         folder: Used to save different forms of visualization.
-        video: Whether video is wanted for some visualizations.
         layers: Layers selected for visualization.
     """
 
@@ -23,16 +22,14 @@ class Heatmap(Visual):
         self,
         visual: Visual = None,
         folder: str = "Heatmap",
-        video: bool = False
     ):
         """Intializes visualization methods and folders.
 
         Args:
             visual: Allows for other forms of visualization.
             folder: Used to save different forms of visualization.
-            video: Whether video is wanted for some visualizations.
         """
-        super().__init__(visual, folder, video)
+        super().__init__(visual, folder)
         self._layers = None
 
 
@@ -64,11 +61,8 @@ class Heatmap(Visual):
 
                 layer_num = 1
                 for values in activations:
-                    if name == "Output":
-                        try:
-                            self.plot_heatmap(values, data['labels'])
-                        except KeyError:
-                            self.plot_heatmap(values)
+                    if name == "Output" and 'labels' in data:
+                        self.plot_heatmap(values, data['labels'])
                     else:
                         self.plot_heatmap(values)
 
@@ -80,8 +74,6 @@ class Heatmap(Visual):
                     )
                     
                     layer_num += 1
-
-        self.save_videos(data)
 
         if self.visual is not None:
             self.visual.visualize(visual_data)
