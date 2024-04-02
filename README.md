@@ -5,7 +5,8 @@ Welcome to my neural network visualization project. This project aims to visuali
 ## Examples
 **Speech Classifer**<br />
 'right' input audio sliced into increasing 10ms intervals. Model from [PyTorch](https://pytorch.org/tutorials/intermediate/speech_command_classification_with_torchaudio_tutorial.html)
-https://github.com/Hotrod1220/NN_Visualization/assets/103224887/91fa9f46-5819-4693-bc84-aa48ded7c8b2
+
+https://github.com/Hotrod1220/NN_Visualization/assets/103224887/aa721bc5-f204-4c06-b2d7-3d7bacb8b60e
 
 **Multiple Overlapping Digit Classifier**<br />
 Model can be found [here](https://github.com/braycarlson/thesis)
