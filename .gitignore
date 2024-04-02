@@ -139,7 +139,6 @@ cython_debug/
 .DS_Store
 ._.DS_Store
 
-images
 state
 Visualization/
 data

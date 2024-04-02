@@ -5,6 +5,7 @@ numpy
 imageio
 --upgrade imageio-ffmpeg
 pathlib
+pandas
 seaborn
 scipy
 torch
