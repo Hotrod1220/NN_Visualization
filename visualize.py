@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import os
-import imageio
 import torch
 import inquirer
-import numpy as np
 import matplotlib.pyplot as plt
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from natsort import natsorted 
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 class Visual(ABC):
@@ -39,7 +40,7 @@ class Visual(ABC):
 
 
     @abstractmethod
-    def visualize(self, data: dict[str, dict]):
+    def visualize(self, data: list[dict[str, dict[str, torch.Tensor]]]) -> None:
         pass
 
 
@@ -49,7 +50,7 @@ class Visual(ABC):
         model: str,
         layer: str = None,
         layer_num: str = None
-    ):
+    ) -> None:
         """Saves figure to folder.
 
         Args:
@@ -60,29 +61,27 @@ class Visual(ABC):
         """
         ext = file.find('.')
         ext = file[:ext] if ext != -1 else file
-        if ext != '':
-            file = "file_" + ext
-        else:
-            file = "file_" + file
+        file = ext if ext != '' else file
 
         path = Path.cwd().joinpath('Visualization')
-        path = path.joinpath(self.folder).joinpath(file)
+        path = path.joinpath(self.folder).joinpath(model)
 
         if layer is None and layer_num is None:
             path.mkdir(parents=True, exist_ok=True)
-            path = path.joinpath(model + ".png")
-        else: 
-            path = path.joinpath(model).joinpath(layer)
+            path = path.joinpath(file + ".png")
+        else:
+            file = "file_" + file
+            path = path.joinpath(file).joinpath(layer)
             path.mkdir(parents=True, exist_ok=True)
             path = path.joinpath(layer_num + ".png")
 
         plt.savefig(path)
-        plt.clf()
+        plt.close()
 
 
     def select_layers(
             self,
-            data: dict[str, dict[str, torch.Tensor]]
+            data: list[dict[str, dict[str, torch.Tensor]]]
         ) -> dict[str, list[str]]:
         """Prompts the user to select the layers they would like to visualize.
 
@@ -95,6 +94,7 @@ class Visual(ABC):
         visual_layers = {}
         print("\n")
 
+        data = data[0]
         model_options = [entry for entry in data['activations']]
 
         model_question = [inquirer.Checkbox(
@@ -158,88 +158,3 @@ class Visual(ABC):
             activations.append(self.activations_2D(array[i]))
         
         return activations
-    
-
-    def save_videos(self, data: dict[str, dict[str, torch.Tensor]]) -> None:
-        """Visualizes selected neural network layers with heatmaps.
-
-        Args:
-            data: File name, model / layer data, and other attributes.
-        """
-        path = Path.cwd().joinpath("Visualization")
-        path = path.joinpath(self.folder)
-        path = path.joinpath(f"file_{data['file']}")
-
-        models = list(data['activations'].keys())
-        models = [
-            model[:model.find('_')]
-            for model in models
-            if model.find('_') != -1
-        ]
-
-        dup = set()
-        models = [
-            model 
-            for model in models
-            if model in dup or dup.add(model)
-        ]  
-
-        for name in dup:
-            files = []
-            layers = {}
-            for file in os.listdir(path):
-                if file.startswith(name):
-                    file_path = path.joinpath(file)
-                    if file_path.is_file():
-                        files.append(file_path)
-                    else:
-                        for p in file_path.rglob("*"):
-                            f_path = file_path.joinpath(p)
-                            if f_path.is_file() and f_path.suffix == '.png':
-                                files.append(f_path)
-
-            for file in files:
-                if file.parts[-2] not in layers:
-                    layers[file.parts[-2]] = [file]
-                else:
-                    layers[file.parts[-2]].append(file)
-
-            for folder, files in layers.items():
-                if len(layers) > 1:
-                    new_path = path.joinpath(name)
-                else:
-                    new_path = path
-                    folder = name
-                if len(files) > 1:
-                    self.create_video(folder, files, new_path)
-    
-        folders = list(os.walk(path))[1:]
-
-        for folder in folders:
-            if not folder[1] and not folder[2]:
-                os.rmdir(folder[0])
-
-
-    def create_video(self, name: str, files: list[Path], path: Path) -> None:
-        """Creates a video from list of image files.
-         
-        Args:
-            name: video name.
-            files: list of image file paths.
-            path: folder for saving video.
-        """
-        files = natsorted(files)
-        
-        path = path.joinpath(f'{name}.mp4')
-        if path.is_file():
-            path.unlink()
-
-        video_name = str(path)
-        writer = imageio.get_writer(video_name, fps=5)
-
-        for im in files:
-            writer.append_data(imageio.imread(im))
-        writer.close()
-
-        for file in files:
-            file.unlink()

@@ -41,7 +41,7 @@ def main():
         image = image.unsqueeze(0)
 
         info = {
-            'file' : name,
+            'name' : name,
             'data' : image,
             'digit' : i,
             'labels' : [j for j in range(10)]

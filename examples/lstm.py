@@ -31,7 +31,7 @@ def main():
 
     for x_batch, _ in dataset.train_loader: 
         info = {
-            'file' : str(i),
+            'name' : str(i),
             'data' : x_batch
         }
 

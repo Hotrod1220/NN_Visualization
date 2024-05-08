@@ -43,7 +43,7 @@ def main():
     #     outputs = model(**inputs, output_hidden_states=True)
 
     info = {
-        'file' : "librispeech_asr_demo",
+        'name' : "librispeech_asr_demo",
         'data' : inputs
     }
 

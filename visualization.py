@@ -8,7 +8,7 @@ from visualize import Visual
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing_extensions import Callable
+    from typing_extensions import Callable, Any
 
 
 class Visualization:
@@ -23,12 +23,13 @@ class Visualization:
         data: Contains file name, Model-ready input and other attributes 
             used for visualization.
         visual: Forms of visualization desired.
+        hidden: Hidden state used for RNN, LSTMs and GRUs
     """
 
     def __init__(
         self,
         model: torch.nn.Module,
-        model_input: list[dict],
+        model_input: list[dict[str, Any]],
         visual: Visual = None,
     ):
         """Intializes model, input for model and the visualization methods.
@@ -42,38 +43,50 @@ class Visualization:
         self.model = model
         self.data = model_input
         self.visual = visual
+        self.hidden = None
 
 
     @property
     def data(self):
         """Data for input into model and visualization methods.
         
-        Data must be a list of dictionaries with 'data' and 'file' keys.
-        'data' is model-ready input, 'file' is a file string.
+        Data must be a list of dictionaries with 'data' and 'name' keys.
+        'data' is model-ready input, 'name' is a string name. Dictionary 
+        can contain 'labels' which will label the model output layer with 
+        the passed labels.
+
+        Raises:
+            Exception if 'data' or 'name' is missing or is None.
         """
         return self._data
 
 
     @data.setter
-    def data(self, obj: dict):
-        try:
-            correct_format = all(
-                item['data'] is not None and 
-                item['file'] is not None
-                for item in obj
-            )
-
-            if correct_format:
-                self._data = obj
-            else:
-                raise Exception(
-                    "'data' or 'file' is None for an item in the model input "
-                    "list, initialize before setting."
-                )
-        except KeyError:
+    def data(self, obj: list[dict[str, Any]]):
+        correct_format = all(
+            'data' in item and
+            'name' in item
+            for item in obj
+        )
+        
+        if not correct_format:
             raise Exception(
                 "Input for model must contain a list of dictionaries with "
-                "'data' and 'file' keys."
+                "'data' and 'name' keys."
+            )
+        
+        correct_format = all(
+            item['data'] is not None and 
+            isinstance(item['name'], str)
+            for item in obj
+        )
+
+        if correct_format:
+            self._data = obj
+        else:
+            raise Exception(
+                "'data' is None or 'name' is not a string for an item in the "
+                "model input list, initialize before setting."
             )
 
 
@@ -91,20 +104,25 @@ class Visualization:
         
         activations = self.activations()
         
+        data = []
         for entry in self.data:
             model_data = entry['data']
-            name = entry['file']
-
-            print(f"\nVisualizing file: {name}")
+            name = entry['name']
 
             self.input_model(model_data, name)
             activations = self.normalize(activations)
             
             entry['activations'] = activations
-            self.visual.visualize(entry)
+            data.append(deepcopy(entry))
+
+        self.visual.visualize(data)
 
 
-    def input_model(self, data: torch.Tensor | tuple, name: str) -> None:
+    def input_model(
+            self,
+            data: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
+            name: str
+        ) -> None:
         """Inputs data into the model.
 
         Args:
@@ -117,7 +135,12 @@ class Visualization:
         """
         try:
             if isinstance(data, tuple):
-                _ = self.model(*data)
+                if self.hidden is None:
+                    self.hidden = data[1]
+                out = self.model(data[0], self.hidden)
+                
+                if isinstance(out, tuple):
+                    self.hidden = out[1]
             else:
                 _ = self.model(data)
 
@@ -186,10 +209,11 @@ class Visualization:
 
                 hook, activation = self.get_activation(module_name, activation)
                 layer.register_forward_hook(hook)
+                last_activation = activation
+                last_layer = layer
         
-        activation = model_activations[model]
-        hook, activation = self.get_activation("Output", activation)
-        layer.register_forward_hook(hook)
+        hook, activation = self.get_activation("Output", last_activation)
+        last_layer.register_forward_hook(hook)
 
         return model_activations
 
@@ -253,7 +277,13 @@ class Visualization:
             for layer, value in model.items():
                 if layer == 'Output':
                     for other, value2 in model.items():
-                        if torch.all(value.eq(value2)):
+                        if other == layer:
+                            continue
+                        equal = (
+                            value2.shape == value.shape and 
+                            torch.all(value.eq(value2))
+                        )
+                        if equal:
                             del activations[model_name][other]
                             return activations
         return activations

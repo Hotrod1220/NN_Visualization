@@ -36,7 +36,7 @@ def main():
     )
 
     info = {
-        'file' : 'image.png',
+        'name' : 'image.png',
         'data' : tensor
     }
 
