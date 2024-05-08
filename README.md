@@ -45,7 +45,7 @@ Model can be found [here](https://github.com/braycarlson/thesis)
 - **Videos:**
   - Transform visualizations into a video.
   - Helpful for dissecting inputs and training of networks.
-    - Visualizating the model can done throughout training and made into a video.
+    - Visualizing the model can be done throughout training and made into a video.
     - Future idea: Can overfitting be observed from videos?
 
 ## Getting Started
